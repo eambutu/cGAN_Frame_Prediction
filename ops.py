@@ -31,7 +31,7 @@ def linear(input, output_size, scope=None, stddev=0.02, bias_start=0.0):
         bias = tf.get_variable("b", [output_size],
                                initializer=tf.constant_initializer(bias_start))
 
-        return tf.matmul(input, matrix) + bias, matrix, bias
+        return tf.matmul(input, matrix) + bias
 
 
 def conv2d(input, output_dim, len, stride, stddev=0.02, name="conv2d"):
@@ -57,4 +57,4 @@ def deconv2d(input, output_shape, len, stride, stddev=0.02, name="deconv2d"):
         b = tf.get_variable('b', [output_shape[-1]], initializer=tf.constant_initializer(0.0))
         deconv = tf.reshape(tf.nn.bias_add(deconv, b), deconv.get_shape())
 
-        return deconv, w, b
+        return deconv
