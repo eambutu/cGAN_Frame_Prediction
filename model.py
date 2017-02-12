@@ -15,7 +15,7 @@ class DCGAN(object):
     def __init__(self, sess, data_file, data_dir, dataset_name, input_height,
                  input_width, output_height, output_width, is_crop,
                  batch_size=64, z_dim=100, gf_dim=64, df_dim=64, gfc_dim=1024,
-                 dfc_dim=1024, c_dim=3):
+                 dfc_dim=1024, c_dim=3, checkpoint_dir=None):
         """
         Args:
             sess: tensorflow session
@@ -68,6 +68,7 @@ class DCGAN(object):
         self.g_bn3 = batch_norm(name='g_bn3')
         self.g_bn4 = batch_norm(name='g_bn4')
 
+        self.checkpoint_dir = checkpoint_dir
         self._build_model()
 
     def _build_model(self):
@@ -178,7 +179,7 @@ class DCGAN(object):
                     print 'Hello'
 
                 if counter % 500 == 1:
-                    self.save(config.checkpoint_dir, counter)
+                    self.save(self.checkpoint_dir, counter)
 
     def discriminator(self, image, y=None, reuse=False):
         with tf.variable_scope('D') as scope:
