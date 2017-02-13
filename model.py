@@ -11,7 +11,7 @@ from ops import *
 from utils import *
 
 
-class DCGAN(object):
+class FlowGAN(object):
     def __init__(self, sess, data_file, data_dir, dataset_name, input_height,
                  input_width, output_height, output_width, is_crop,
                  batch_size=64, z_dim=100, gf_dim=64, df_dim=64, gfc_dim=1024,

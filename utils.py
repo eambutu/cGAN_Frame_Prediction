@@ -1,5 +1,8 @@
 import scipy.misc
 import numpy as np
+import pprint
+
+pp = pprint.PrettyPrinter()
 
 
 def center_crop(x, crop_h, crop_w, resize_h, resize_w):

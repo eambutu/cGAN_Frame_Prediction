@@ -1,8 +1,8 @@
 import os
 import numpy as np
 
-from model import DCGAN
-from utils import pp, visualize, to_json
+from model import FlowGAN
+from utils import pp  # , visualize
 
 import tensorflow as tf
 
@@ -51,7 +51,7 @@ def main(_):
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
     with tf.Session(config=run_config) as sess:
-        dcgan = DCGAN(
+        flowgan = FlowGAN(
             sess,
             data_file=FLAGS.data_file,
             data_dir=FLAGS.data_dir,
@@ -66,14 +66,14 @@ def main(_):
             checkpoint_dir=FLAGS.checkpoint_dir)
 
     if FLAGS.is_train:
-        dcgan.train(FLAGS)
+        flowgan.train(FLAGS)
     else:
-        if not dcgan.load(FLAGS.checkpoint_dir):
+        if not flowgan.load(FLAGS.checkpoint_dir):
             raise Exception("[!] Train a model first, then run test mode")
 
     # Below is codes for visualization
-    OPTION = 1
-    visualize(sess, dcgan, FLAGS, OPTION)
+    # OPTION = 1
+    # visualize(sess, flowgan, FLAGS, OPTION)
 
 
 if __name__ == '__main__':
