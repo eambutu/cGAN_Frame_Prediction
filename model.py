@@ -40,6 +40,7 @@ class FlowGAN(object):
         self.output_width = output_width
 
         self.is_crop = is_crop
+        self.batch_size = batch_size
 
         self.z_dim = z_dim
 
@@ -67,22 +68,26 @@ class FlowGAN(object):
         self.g_bn2 = batch_norm(name='g_bn2')
         self.g_bn3 = batch_norm(name='g_bn3')
         self.g_bn4 = batch_norm(name='g_bn4')
+        self.g_bn5 = batch_norm(name='g_bn5')
 
         self.checkpoint_dir = checkpoint_dir
         self._build_model()
 
     def _build_model(self):
         if self.is_crop:
-            image_dims = [self.output_height, self.output_width, (self.c_dim+2)]
+            image_dims = [self.output_height, self.output_width, self.c_dim]
+            flow_dims = [self.output_height, self.output_width, (self.c_dim+2)]
         else:
-            image_dims = [self.input_height, self.input_height, (self.c_dim+2)]
+            image_dims = [self.input_height, self.input_height, self.c_dim]
+            flow_dims = [self.input_height, self.input_height, (self.c_dim+2)]
 
+        # Only using images for last frames currently
         self.first_frames = tf.placeholder(
-            tf.float32, [self.batch_size] + image_dims, name='first_frames')
+            tf.float32, [self.batch_size] + flow_dims, name='first_frames')
         self.last_frames = tf.placeholder(
             tf.float32, [self.batch_size] + image_dims, name='last_frames')
-        self.sample_inputs = tf.placeholder(
-            tf.float32, [self.sample_num] + image_dims, name='sample_inputs')
+        # self.sample_inputs = tf.placeholder(
+        #    tf.float32, [self.sample_num] + image_dims, name='sample_inputs')
 
         first_frames = self.first_frames
         last_frames = self.last_frames
@@ -92,7 +97,7 @@ class FlowGAN(object):
         self.G = self.generator(first_frames, self.z)
         self.D, self.D_logits = self.discriminator(last_frames)
 
-        self.sampler = self.sampler(self.z)
+        # self.sampler = self.sampler(self.z)
         self.D_, self.D_logits_ = self.discriminator(self.G, reuse=True)
 
         self.d_loss_real = tf.reduce_mean(
@@ -122,12 +127,12 @@ class FlowGAN(object):
 
         tf.initialize_all_variables().run()
 
-        sample_z = np.random.uniform(-1, 1, size=(self.sample_num, self.z_dim))
+        # sample_z = np.random.uniform(-1, 1, size=(self.sample_num, self.z_dim))
 
         # TODO: get sample files
-        sample_files = 'blah'
-        sample = ['blah']
-        sample_inputs = 'blah'
+        # sample_files = 'blah'
+        # sample = ['blah']
+        # sample_inputs = 'blah'
 
         counter = 1
         start_time = time.time()
@@ -149,8 +154,10 @@ class FlowGAN(object):
                 batch_images = get_images(self.data_dir, self.data_file,
                                           batch_idxs, self.output_height,
                                           self.output_width, True)
+                
+                # Only take image for discriminator currently
                 f_frames = batch_images[:, :, :, :5]
-                l_frames = batch_images[:, :, :, 5:]
+                l_frames = batch_images[:, :, :, 5:8]
 
                 batch_z = np.random.uniform(-1, 1, [config.batch_size, self.z_dim]) \
                     .astype(np.float32)
@@ -170,13 +177,12 @@ class FlowGAN(object):
                                          self.z: batch_z})
 
                 counter += 1
-                print "Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
+                print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
                     % (epoch, idx, batch_idxs, time.time() - start_time,
-                       errD_fake + errD_real, errG)
+                       errD_fake + errD_real, errG))
 
-                if counter % 100 == 1:
-                    # Save the images from sampler
-                    print 'Hello'
+                # if counter % 100 == 1:
+                #     Save the images from sampler
 
                 if counter % 500 == 1:
                     self.save(self.checkpoint_dir, counter)
@@ -209,7 +215,7 @@ class FlowGAN(object):
             i2 = lrelu(self.gi_bn2(conv2d(i1, self.gf_dim*4, 5, 2, name='g_i2_conv')))
 
             # project 'z' and reshape
-            self.z_ = linear(z, self.gf_dim*2*s_h15*s_w16, 'g_z0_lin')
+            self.z_ = linear(z, self.gf_dim*2*s_h16*s_w16, 'g_z0_lin')
 
             self.z0 = tf.reshape(self.z_, [-1, s_h16, s_w16, self.gf_dim*2])
             z0 = tf.nn.relu(self.gz_bn0(self.z0))
@@ -219,9 +225,9 @@ class FlowGAN(object):
             z1 = tf.nn.relu(self.gz_bn1(self.z1))
 
             # deconvolution and convolution layers
-            self.h0 = tf.pack([i2, z1])
+            self.h0 = tf.concat([i2, z1], 3)
 
-            self.h1 = deconv2d(h0, [self.batch_size, s_h4, s_w4, self.gf_dim*4],
+            self.h1 = deconv2d(self.h0, [self.batch_size, s_h4, s_w4, self.gf_dim*4],
                                4, 2, name='g_h1')
             h1 = tf.nn.relu(self.g_bn1(self.h1))
 
@@ -236,9 +242,13 @@ class FlowGAN(object):
                                4, 2, name='g_h4')
             h4 = tf.nn.relu(self.g_bn4(self.h4))
 
-            self.h5 = conv2d(h4, self.gf_dim, 3, 1, name='g_h3_conv')
+            self.h5 = conv2d(h4, self.gf_dim, 3, 1, name='g_h5_conv')
+            h5 = tf.nn.relu(self.g_bn5(self.h5))
 
-            return tf.nn.tanh(h5)
+            self.h6 = deconv2d(h5, [self.batch_size, s_h, s_w, 3],
+                               4, 2, name='g_h6')
+
+            return tf.nn.tanh(self.h6)
 
     def sampler(self, z):
         with tf.variable_scope('G') as scope:
