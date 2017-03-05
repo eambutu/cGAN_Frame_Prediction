@@ -125,7 +125,7 @@ class FlowGAN(object):
         g_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
             .minimize(self.g_loss, var_list=self.g_vars)
 
-        tf.initialize_all_variables().run()
+        tf.initialize_all_variables().run(session=self.sess)
 
         # sample_z = np.random.uniform(-1, 1, size=(self.sample_num, self.z_dim))
 
@@ -146,7 +146,7 @@ class FlowGAN(object):
             data_size = -1
             with open(self.data_file, 'r') as fin:
                 data_size = len(fin.readlines())
-            num_batches = min(len(data_size, config.train_size)) // config.batch_size
+            num_batches = min(data_size, config.train_size) // config.batch_size
 
             for idx in xrange(0, num_batches):
                 batch_idxs = [i for i in xrange(idx*config.batch_size,
@@ -154,7 +154,7 @@ class FlowGAN(object):
                 batch_images = get_images(self.data_dir, self.data_file,
                                           batch_idxs, self.output_height,
                                           self.output_width, True)
-                
+
                 # Only take image for discriminator currently
                 f_frames = batch_images[:, :, :, :5]
                 l_frames = batch_images[:, :, :, 5:8]
@@ -245,8 +245,7 @@ class FlowGAN(object):
             self.h5 = conv2d(h4, self.gf_dim, 3, 1, name='g_h5_conv')
             h5 = tf.nn.relu(self.g_bn5(self.h5))
 
-            self.h6 = deconv2d(h5, [self.batch_size, s_h, s_w, 3],
-                               4, 2, name='g_h6')
+            self.h6 = conv2d(h5, 3, 3, 1, name='g_h6_conv')
 
             return tf.nn.tanh(self.h6)
 
