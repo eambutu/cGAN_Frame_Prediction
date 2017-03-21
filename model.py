@@ -102,13 +102,13 @@ class FlowGAN(object):
 
         self.d_loss_real = tf.reduce_mean(
             tf.nn.sigmoid_cross_entropy_with_logits(
-                logits=self.D_logits, targets=tf.ones_like(self.D)))
+                logits=self.D_logits, labels=tf.ones_like(self.D)))
         self.d_loss_fake = tf.reduce_mean(
             tf.nn.sigmoid_cross_entropy_with_logits(
-                logits=self.D_logits, targets=tf.zeros_like(self.D_)))
+                logits=self.D_logits, labels=tf.zeros_like(self.D_)))
         self.g_loss = tf.reduce_mean(
             tf.nn.sigmoid_cross_entropy_with_logits(
-                logits=self.D_logits_, targets=tf.ones_like(self.D_)))
+                logits=self.D_logits_, labels=tf.ones_like(self.D_)))
 
         self.d_loss = self.d_loss_real + self.d_loss_fake
 
@@ -225,7 +225,7 @@ class FlowGAN(object):
             z1 = tf.nn.relu(self.gz_bn1(self.z1))
 
             # deconvolution and convolution layers
-            self.h0 = tf.concat(3, [i2, z1])
+            self.h0 = tf.concat([i2, z1], 3)
 
             self.h1 = deconv2d(self.h0, [self.batch_size, s_h4, s_w4, self.gf_dim*4],
                                4, 2, name='g_h1')
