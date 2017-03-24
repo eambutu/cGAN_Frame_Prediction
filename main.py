@@ -18,7 +18,8 @@ flags.DEFINE_integer("output_height", 128, "The size of the output images to pro
 flags.DEFINE_integer("output_width", 128, "The size of the output images to produce. If None, same value as output_height [None]")
 flags.DEFINE_integer("c_dim", 3, "Dimension of image color. [3]")
 flags.DEFINE_string("data_file", "./train_genlist_all_img_5frames.txt", "Name of dataset file")
-flags.DEFINE_string("data_dir", "/scratch/xiaolonw/UCF_data/UCF101_frames_org2/ApplyEyeMakeup", "Directory of data")
+flags.DEFINE_string("data_dir", "/scratch/pkwang/UCF101_frames_org2/ApplyEyeMakeup/", "Directory of data")
+flags.DEFINE_string("data_dir_flow", "/scratch/pkwang/UCF101_opt_flows_org2/ApplyEyeMakeup/", "Directory of data")
 flags.DEFINE_string("dataset_name", "Makeup5Frames", "Name of dataset")
 flags.DEFINE_string("checkpoint_dir", "checkpoint", "Directory name to save the checkpoints [checkpoint]")
 flags.DEFINE_string("sample_dir", "samples", "Directory name to save the image samples [samples]")
@@ -55,6 +56,7 @@ def main(_):
             sess,
             data_file=FLAGS.data_file,
             data_dir=FLAGS.data_dir,
+            data_dir_flow=FLAGS.data_dir_flow,
             dataset_name=FLAGS.dataset_name,
             input_height=FLAGS.input_height,
             input_width=FLAGS.input_width,

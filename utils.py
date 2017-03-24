@@ -37,28 +37,35 @@ def get_image(image_path, resize_height, resize_width, is_crop, is_grayscale):
                      resize_height, resize_width, is_crop)
 
 
-def get_images(path, data_file, idxs, resize_height, resize_width, is_crop):
+def get_images(path, path_flow, data_file, idxs, resize_height, resize_width, is_crop):
     data = []
     with open(data_file, 'r') as fin:
         lines = fin.readlines()
         for idx in idxs:
             line = lines[idx]
             pair = line.split(' ')
+            pair[0] = pair[0].strip()
+            pair[1] = pair[1].strip()
             # Assumes that image file extension is 4 characters long
             image1 = get_image(path + pair[0], resize_height, resize_width,
                                True, False)
-            image1_x = get_image(path + pair[0][:-4] + '_x' + pair[0][-4:],
+            image1_x = get_image(path_flow + pair[0][:-4] + '_x' + pair[0][-4:],
                                  resize_height, resize_width, True, True)
-            image1_y = get_image(path + pair[0][:-4] + '_y' + pair[0][-4:],
+            image1_x = np.expand_dims(image1_x, axis=2)
+            image1_y = get_image(path_flow + pair[0][:-4] + '_y' + pair[0][-4:],
                                  resize_height, resize_width, True, True)
+            image1_y = np.expand_dims(image1_y, axis=2)
             image2 = get_image(path + pair[1], resize_height, resize_width,
                                True, False)
-            image2_x = get_image(path + pair[1][:-4] + '_x' + pair[1][-4:],
+            image2_x = get_image(path_flow + pair[1][:-4] + '_x' + pair[1][-4:],
                                  resize_height, resize_width, True, True)
-            image2_y = get_image(path + pair[1][:-4] + '_y' + pair[1][-4:],
+            image2_x = np.expand_dims(image2_x, axis=2)
+            image2_y = get_image(path_flow + pair[1][:-4] + '_y' + pair[1][-4:],
                                  resize_height, resize_width, True, True)
-            data.append(np.concatenate(image1, image1_x, image1_y, image2,
-                                       image2_x, image2_y), axis=2)
+            image2_y = np.expand_dims(image2_y, axis=2)
+            temp = np.concatenate([image1, image1_x, image1_y, image2,
+                                   image2_x, image2_y], axis=2)
+            data.append(temp)
 
     # Returns a 4D tensor of shape (idxs, height, width, 10)
     return np.array(data).astype(np.float32)

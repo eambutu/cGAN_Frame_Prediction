@@ -12,8 +12,8 @@ from utils import *
 
 
 class FlowGAN(object):
-    def __init__(self, sess, data_file, data_dir, dataset_name, input_height,
-                 input_width, output_height, output_width, is_crop,
+    def __init__(self, sess, data_file, data_dir, data_dir_flow, dataset_name,
+                 input_height, input_width, output_height, output_width, is_crop,
                  batch_size=64, z_dim=100, gf_dim=64, df_dim=64, gfc_dim=1024,
                  dfc_dim=1024, c_dim=3, checkpoint_dir=None):
         """
@@ -32,6 +32,7 @@ class FlowGAN(object):
 
         self.data_file = data_file
         self.data_dir = data_dir
+        self.data_dir_flow = data_dir_flow
         self.dataset_name = dataset_name
 
         self.input_height = input_height
@@ -151,9 +152,9 @@ class FlowGAN(object):
             for idx in xrange(0, num_batches):
                 batch_idxs = [i for i in xrange(idx*config.batch_size,
                                                 (idx+1)*config.batch_size)]
-                batch_images = get_images(self.data_dir, self.data_file,
-                                          batch_idxs, self.output_height,
-                                          self.output_width, True)
+                batch_images = get_images(self.data_dir, self.data_dir_flow,
+                                          self.data_file, batch_idxs,
+                                          self.output_height, self.output_width, True)
 
                 # Only take image for discriminator currently
                 f_frames = batch_images[:, :, :, :5]
@@ -163,22 +164,25 @@ class FlowGAN(object):
                     .astype(np.float32)
 
                 # Update D network
-                _ = d_optim.eval({self.first_frames: f_frames,
+                _ = self.sess.run([d_optim], feed_dict={self.first_frames: f_frames,
                                   self.last_frames: l_frames, self.z: batch_z})
 
                 # Update G network
-                _ = g_optim.eval({self.first_frame: f_frames, self.z: batch_z})
-                _ = g_optim.eval({self.first_frame: f_frames, self.z: batch_z})
+                _ = self.sess.run([g_optim], feed_dict={self.first_frames: f_frames,
+                                  self.z: batch_z})
+                _ = self.sess.run([g_optim], feed_dict={self.first_frames: f_frames,
+                                  self.z: batch_z})
 
-                errD_fake = self.d_loss_fake.eval({self.first_frame: f_frames,
-                                                   self.z: batch_z})
-                errD_real = self.d_loss_real.eval({self.last_frames: l_frames})
+                errD_fake = self.d_loss_fake.eval({self.first_frames: f_frames,
+                                                   self.last_frames: l_frames,
+                                                   self.z: batch_z}, self.sess)
+                errD_real = self.d_loss_real.eval({self.last_frames: l_frames}, self.sess)
                 errG = self.g_loss.eval({self.first_frames: f_frames,
-                                         self.z: batch_z})
+                                         self.z: batch_z}, self.sess)
 
                 counter += 1
                 print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
-                    % (epoch, idx, batch_idxs, time.time() - start_time,
+                    % (epoch, idx, num_batches, time.time() - start_time,
                        errD_fake + errD_real, errG))
 
                 # if counter % 100 == 1:
