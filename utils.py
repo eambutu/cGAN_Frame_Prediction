@@ -41,6 +41,8 @@ def get_images(path, path_flow, data_file, idxs, resize_height, resize_width, is
     data = []
     with open(data_file, 'r') as fin:
         lines = fin.readlines()
+        if not idxs:
+            idxs = range(0, len(lines))
         for idx in idxs:
             line = lines[idx]
             pair = line.split(' ')
@@ -69,3 +71,6 @@ def get_images(path, path_flow, data_file, idxs, resize_height, resize_width, is
 
     # Returns a 4D tensor of shape (idxs, height, width, 10)
     return np.array(data).astype(np.float32)
+
+def save_image(path, image):
+    scipy.misc.imsave(path, image)

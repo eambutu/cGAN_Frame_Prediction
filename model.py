@@ -14,8 +14,8 @@ from utils import *
 class FlowGAN(object):
     def __init__(self, sess, data_file, data_dir, data_dir_flow, dataset_name,
                  input_height, input_width, output_height, output_width, is_crop,
-                 batch_size=64, z_dim=100, gf_dim=64, df_dim=64, gfc_dim=1024,
-                 dfc_dim=1024, c_dim=3, checkpoint_dir=None):
+                 sample_num, sample_dir, batch_size=64, z_dim=100, gf_dim=64, df_dim=64, 
+                 gfc_dim=1024, dfc_dim=1024, c_dim=3, checkpoint_dir=None):
         """
         Args:
             sess: tensorflow session
@@ -42,6 +42,8 @@ class FlowGAN(object):
 
         self.is_crop = is_crop
         self.batch_size = batch_size
+        self.sample_num = sample_num
+        self.sample_dir = sample_dir
 
         self.z_dim = z_dim
 
@@ -87,18 +89,21 @@ class FlowGAN(object):
             tf.float32, [self.batch_size] + flow_dims, name='first_frames')
         self.last_frames = tf.placeholder(
             tf.float32, [self.batch_size] + image_dims, name='last_frames')
-        # self.sample_inputs = tf.placeholder(
-        #    tf.float32, [self.sample_num] + image_dims, name='sample_inputs')
+        self.sample_inputs = tf.placeholder(
+           tf.float32, [self.sample_num] + flow_dims, name='sample_inputs')
 
         first_frames = self.first_frames
         last_frames = self.last_frames
+        sample_inputs = self.sample_inputs
 
         self.z = tf.placeholder(tf.float32, [None, self.z_dim], name='z')
+        self.z_sample = tf.placeholder(tf.float32, [None, self.z_dim],
+                                       name='z_sample')
 
         self.G = self.generator(first_frames, self.z)
         self.D, self.D_logits = self.discriminator(last_frames)
+        self.sampler = self.sampler(sample_inputs, self.z_sample)
 
-        # self.sampler = self.sampler(self.z)
         self.D_, self.D_logits_ = self.discriminator(self.G, reuse=True)
 
         self.d_loss_real = tf.reduce_mean(
@@ -191,6 +196,35 @@ class FlowGAN(object):
                 if counter % 500 == 1:
                     self.save(self.checkpoint_dir, counter)
 
+    def get_samples(self):
+        tf.initialize_all_variables().run(session=self.sess)
+
+        sample_z = np.random.uniform(-1, 1, [self.sample_num, self.z_dim]) \
+            .astype(np.float32)
+
+        if self.load(self.checkpoint_dir):
+            print(" [*] Load SUCCESS")
+        else:
+            raise Exception("[!] Train a model first, then run test mode")
+
+        images = get_images(self.data_dir, self.data_dir_flow, self.data_file,
+                            None, self.output_height, self.output_width, True)
+
+        f_frames = images[:, :, :, :5]
+        l_frames = images[:, :, :, 5:8]
+
+        for i in range(0, 23):
+            f_frames_trunc = f_frames[(20*i):(20*(i+1)):, :, :]
+            l_frames_trunc = l_frames[(20*i):(20*(i+1)):, :, :]
+
+            pred_images = self.sampler.eval({self.sample_inputs: f_frames_trunc,
+                                             self.z_sample: sample_z}, self.sess)
+
+            for j in range(0, 20):
+                impath = self.sample_dir + '/' + str(20*i + j)
+                save_image(impath + '.png', l_frames_trunc[j])
+                save_image(impath + '_gen.png', pred_images[j])
+
     def discriminator(self, image, y=None, reuse=False):
         with tf.variable_scope('D') as scope:
             if reuse:
@@ -253,7 +287,7 @@ class FlowGAN(object):
 
             return tf.nn.tanh(self.h6)
 
-    def sampler(self, z):
+    def sampler(self, image, z):
         with tf.variable_scope('G') as scope:
             scope.reuse_variables()
 
@@ -263,25 +297,47 @@ class FlowGAN(object):
             s_w2, s_w4, s_w8, s_w16 = \
                 int(s_w/2), int(s_w/4), int(s_w/8), int(s_w/16)
 
+            # convolutional layers on image
+            i0 = lrelu(conv2d(image, self.gf_dim, 5, 2, name='g_i0_conv'))
+            i1 = lrelu(self.gi_bn1(conv2d(i0, self.gf_dim*2, 5, 2, name='g_i1_conv'),
+                                   train=False))
+            i2 = lrelu(self.gi_bn2(conv2d(i1, self.gf_dim*4, 5, 2, name='g_i2_conv'),
+                                   train=False))
+
             # project 'z' and reshape
-            z_ = linear(z, self.gf_dim*8*s_h16*s_w16, 'g_h0_lin')
+            z_ = linear(z, self.gf_dim*2*s_h16*s_w16, 'g_z0_lin')
 
-            h0 = tf.reshape(z_, [-1, s_h16, s_w16, self.gf_dim * 8])
-            h0 = tf.nn.relu(self.g_bn0(h0, train=False))
+            z0 = tf.reshape(z_, [-1, s_h16, s_w16, self.gf_dim*2])
+            z0 = tf.nn.relu(self.gz_bn0(z0, train=False))
 
-            h1 = deconv2d(h0, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h1')
+            z1 = deconv2d(z0, [self.sample_num, s_h8, s_w8, self.gf_dim*2],
+                               4, 2, name='g_z1')
+            z1 = tf.nn.relu(self.gz_bn1(z1, train=False))
+
+            # deconvolution and convolution layers
+            h0 = tf.concat([i2, z1], 3)
+
+            h1 = deconv2d(h0, [self.sample_num, s_h4, s_w4, self.gf_dim*4],
+                               4, 2, name='g_h1')
             h1 = tf.nn.relu(self.g_bn1(h1, train=False))
 
-            h2 = deconv2d(h1, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h2')
+            h2 = deconv2d(h1, [self.sample_num, s_h2, s_w2, self.gf_dim*2],
+                               4, 2, name='g_h2')
             h2 = tf.nn.relu(self.g_bn2(h2, train=False))
 
-            h3 = deconv2d(h2, [self.batch_size, s_h2, s_w2, self.gf_dim*1], name='g_h3')
+            h3 = conv2d(h2, self.gf_dim*2, 3, 1, name='g_h3_conv')
             h3 = tf.nn.relu(self.g_bn3(h3, train=False))
 
-            h4 = deconv2d(h3, [self.batch_size, s_h, s_w, self.c_dim], name='g_h4')
+            h4 = deconv2d(h3, [self.sample_num, s_h, s_w, self.gf_dim],
+                               4, 2, name='g_h4')
+            h4 = tf.nn.relu(self.g_bn4(h4, train=False))
 
-            return tf.nn.tanh(h4)
+            h5 = conv2d(h4, self.gf_dim, 3, 1, name='g_h5_conv')
+            h5 = tf.nn.relu(self.g_bn5(h5, train=False))
 
+            h6 = conv2d(h5, 3, 3, 1, name='g_h6_conv')
+
+            return tf.nn.tanh(h6)
 
     @property
     def model_dir(self):

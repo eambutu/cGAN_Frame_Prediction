@@ -17,13 +17,14 @@ flags.DEFINE_integer("input_width", 341, "The size of image to use (will be cent
 flags.DEFINE_integer("output_height", 128, "The size of the output images to produce [64]")
 flags.DEFINE_integer("output_width", 128, "The size of the output images to produce. If None, same value as output_height [None]")
 flags.DEFINE_integer("c_dim", 3, "Dimension of image color. [3]")
-flags.DEFINE_string("data_file", "./train_genlist_all_img_5frames.txt", "Name of dataset file")
+flags.DEFINE_string("data_file", "./train_genlist_all_img_5frames_test.txt", "Name of dataset file")
 flags.DEFINE_string("data_dir", "/scratch/pkwang/UCF101_frames_org2/ApplyEyeMakeup/", "Directory of data")
 flags.DEFINE_string("data_dir_flow", "/scratch/pkwang/UCF101_opt_flows_org2/ApplyEyeMakeup/", "Directory of data")
 flags.DEFINE_string("dataset_name", "Makeup5Frames", "Name of dataset")
 flags.DEFINE_string("checkpoint_dir", "checkpoint", "Directory name to save the checkpoints [checkpoint]")
 flags.DEFINE_string("sample_dir", "samples", "Directory name to save the image samples [samples]")
-flags.DEFINE_boolean("is_train", True, "True for training, False for testing [False]")
+flags.DEFINE_boolean("is_train", False, "True for training, False for testing [False]")
+flags.DEFINE_integer("sample_num", 20, "Number of images for generating samples")
 flags.DEFINE_boolean("is_crop", True, "True for training, False for testing [False]")
 flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
 FLAGS = flags.FLAGS
@@ -63,6 +64,8 @@ def main(_):
             output_height=FLAGS.output_height,
             output_width=FLAGS.output_width,
             is_crop=FLAGS.is_crop,
+            sample_num=FLAGS.sample_num,
+            sample_dir=FLAGS.sample_dir,
             batch_size=FLAGS.batch_size,
             c_dim=FLAGS.c_dim,
             checkpoint_dir=FLAGS.checkpoint_dir)
@@ -72,6 +75,7 @@ def main(_):
     else:
         if not flowgan.load(FLAGS.checkpoint_dir):
             raise Exception("[!] Train a model first, then run test mode")
+        flowgan.get_samples()
 
     # Below is codes for visualization
     # OPTION = 1
